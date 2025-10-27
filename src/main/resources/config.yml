@@ -1,0 +1,52 @@
+# Configuración del Board
+# Esta configuración se puede recargar con /board reload
+
+# Título del Board (soporta colores hex como &#FF0000 y colores &)
+title: "Servidor Board"
+
+# Líneas de encabezado (animadas si hay múltiples)
+header:
+  animation:
+    enabled: false
+    interval: 40  # ticks para cambiar de línea
+  lines:
+    - "¡Bienvenido al Servidor!"
+    - "¡Disfruta tu estadía!"
+
+# Líneas principales
+lines:
+  - "En línea: %board_online%"
+  - "Lobby: %board_lobby_connected%"
+  - "Servidores:"
+  - "  Lobby: %board_lobby_online%/%board_lobby_max%"
+  - "  Vanilla: %board_vanilla_online%/%board_vanilla_max%"
+  - "  Fabric: %board_fabric_online%/%board_fabric_max%"
+
+# Líneas de pie de página (animadas si hay múltiples)
+footer:
+  animation:
+    enabled: false
+    interval: 60  # ticks para cambiar de línea
+  lines:
+    - "¡Juega limpio y diviértete!"
+    - "¡Visita nuestro discord!"
+
+# Configuración de animaciones
+animations:
+  enabled: true
+  interval: 20  # ticks (1 segundo = 20 ticks)
+
+# Configuración de servidores para integración con Velocity
+servers:
+  - name: "lobby"
+    display: "Lobby"
+    max_players: 100
+  - name: "vanilla"
+    display: "Vanilla"
+    max_players: 50
+  - name: "fabric"
+    display: "Fabric"
+    max_players: 25
+
+# Para agregar más servidores, simplemente añade entradas a la lista 'servers' arriba
+# Los placeholders se generan automáticamente: %board_[server_name]_online% y %board_[server_name]_max%

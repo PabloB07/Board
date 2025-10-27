@@ -1,0 +1,8 @@
+name: Board
+version: '1.0'
+main: cl.xgamers.board.Board
+api-version: '1.21'
+prefix: Board
+authors: [AeroSama, _aero98, blancocl]
+description: Board plugin
+website: blancocl.vercel.app

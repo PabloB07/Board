@@ -53,9 +53,7 @@ public final class Board extends JavaPlugin implements Listener, PluginMessageLi
             boardManager.createBoard(player);
         }
 
-        // Schedule updates
-        int interval = getConfig().getInt("animations.interval", 20);
-        updateTask = getServer().getScheduler().runTaskTimer(this, boardManager::updateAllBoards, 0L, interval);
+        scheduleBoardUpdates();
 
         // Request server counts periodically
         getServer().getScheduler().runTaskTimer(this, this::requestServerCounts, 0L, 600L); // Every 30 seconds
@@ -88,6 +86,18 @@ public final class Board extends JavaPlugin implements Listener, PluginMessageLi
 
     public BoardManager getBoardManager() {
         return boardManager;
+    }
+
+    public void scheduleBoardUpdates() {
+        if (updateTask != null) {
+            updateTask.cancel();
+        }
+        int interval = Math.max(1, getConfig().getInt("animations.interval", 20));
+        updateTask = getServer().getScheduler().runTaskTimer(this, boardManager::updateAllBoards, 0L, interval);
+    }
+
+    public void rescheduleBoardUpdates() {
+        scheduleBoardUpdates();
     }
 
     private void requestServerCounts() {

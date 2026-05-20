@@ -2,9 +2,16 @@
 # Esta configuración se puede recargar con /board reload
 
 # Título del Board (soporta colores hex como &#FF0000 y colores &)
-title: "Servidor Board"
+# Puede ser un texto fijo o varias líneas animadas
+title:
+  animation:
+    enabled: false
+    interval: 40  # ticks para cambiar de línea
+  lines:
+    - "Servidor Board"
+    - "&#FFAA00&lServidor Board"
 
-# Líneas de encabezado (animadas si hay múltiples)
+# Líneas de encabezado (arriba del board, debajo del título)
 header:
   animation:
     enabled: false
@@ -22,7 +29,7 @@ lines:
   - "  Vanilla: %board_vanilla_online%/%board_vanilla_max%"
   - "  Fabric: %board_fabric_online%/%board_fabric_max%"
 
-# Líneas de pie de página (animadas si hay múltiples)
+# Líneas de pie de página (abajo del board)
 footer:
   animation:
     enabled: false
@@ -31,10 +38,10 @@ footer:
     - "¡Juega limpio y diviértete!"
     - "¡Visita nuestro discord!"
 
-# Configuración de animaciones
+# Configuración global de animaciones
 animations:
   enabled: true
-  interval: 20  # ticks (1 segundo = 20 ticks)
+  interval: 20  # ticks entre actualizaciones del board (1 segundo = 20 ticks)
 
 # Configuración de servidores para integración con Velocity
 servers:

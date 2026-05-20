@@ -5,6 +5,7 @@ import me.clip.placeholderapi.PlaceholderAPI;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,9 +16,10 @@ public class BoardManager {
     private final Board plugin;
     private final Map<UUID, FastBoard> boards = new HashMap<>();
     private final Map<UUID, Boolean> toggledOff = new HashMap<>();
+    private int titleAnimationIndex = 0;
     private int headerAnimationIndex = 0;
     private int footerAnimationIndex = 0;
-    private int tickCounter = 0;
+    private long elapsedTicks = 0;
 
     public BoardManager(Board plugin) {
         this.plugin = plugin;
@@ -40,61 +42,97 @@ public class BoardManager {
         FastBoard board = boards.get(player.getUniqueId());
         if (board == null || isToggledOff(player)) return;
 
-        // Update title
-        String title = plugin.getConfig().getString("title", "Board");
-        board.updateTitle(Hex.colorize(title));
+        board.updateTitle(Hex.colorize(getAnimatedLine("title", titleAnimationIndex, "Board")));
 
-        // Get current header and footer based on animation
         List<String> headers = plugin.getConfig().getStringList("header.lines");
         List<String> footers = plugin.getConfig().getStringList("footer.lines");
         List<String> lines = plugin.getConfig().getStringList("lines");
 
-        String header = "";
-        if (!headers.isEmpty()) {
-            if (plugin.getConfig().getBoolean("header.animation.enabled", true)) {
-                header = Hex.colorize(headers.get(headerAnimationIndex % headers.size()));
-            } else {
-                header = Hex.colorize(headers.get(0));
-            }
-        }
+        String header = getAnimatedLine("header", headerAnimationIndex, "");
+        String footer = getAnimatedLine("footer", footerAnimationIndex, "");
 
-        String footer = "";
-        if (!footers.isEmpty()) {
-            if (plugin.getConfig().getBoolean("footer.animation.enabled", true)) {
-                footer = Hex.colorize(footers.get(footerAnimationIndex % footers.size()));
-            } else {
-                footer = Hex.colorize(footers.get(0));
-            }
-        }
-
-        // Combine lines
-        String[] boardLines = new String[lines.size() + (headers.isEmpty() ? 0 : 1) + (footers.isEmpty() ? 0 : 1)];
+        // FastBoard: index 0 = bottom, last index = top (below title)
+        int extraLines = (footers.isEmpty() ? 0 : 1) + (headers.isEmpty() ? 0 : 1);
+        String[] boardLines = new String[lines.size() + extraLines];
         int index = 0;
-        if (!headers.isEmpty()) {
-            boardLines[index++] = header;
+
+        if (!footers.isEmpty()) {
+            boardLines[index++] = footer.isEmpty() ? "" : footer;
         }
         for (String line : lines) {
             boardLines[index++] = Hex.colorize(replacePlaceholders(line, player));
         }
-        if (!footers.isEmpty()) {
-            boardLines[index++] = footer;
+        if (!headers.isEmpty()) {
+            boardLines[index++] = header.isEmpty() ? "" : header;
         }
 
         board.updateLines(boardLines);
     }
 
+    private String getAnimatedLine(String section, int animationIndex, String fallback) {
+        List<String> sectionLines = getSectionLines(section);
+        if (sectionLines.isEmpty()) {
+            return fallback;
+        }
+        if (!shouldAnimate(section)) {
+            return Hex.colorize(sectionLines.getFirst());
+        }
+        return Hex.colorize(sectionLines.get(animationIndex % sectionLines.size()));
+    }
+
+    private List<String> getSectionLines(String section) {
+        if ("title".equals(section)) {
+            if (plugin.getConfig().isString("title")) {
+                String singleTitle = plugin.getConfig().getString("title");
+                return singleTitle != null && !singleTitle.isBlank()
+                        ? List.of(singleTitle)
+                        : Collections.emptyList();
+            }
+            List<String> titleLines = plugin.getConfig().getStringList("title.lines");
+            if (!titleLines.isEmpty()) {
+                return titleLines;
+            }
+            String legacyTitle = plugin.getConfig().getString("title", "Board");
+            return legacyTitle != null && !legacyTitle.isBlank()
+                    ? List.of(legacyTitle)
+                    : Collections.emptyList();
+        }
+        return plugin.getConfig().getStringList(section + ".lines");
+    }
+
+    private boolean shouldAnimate(String section) {
+        if (!plugin.getConfig().getBoolean("animations.enabled", true)) {
+            return false;
+        }
+        List<String> sectionLines = getSectionLines(section);
+        if (sectionLines.size() < 2) {
+            return false;
+        }
+        return plugin.getConfig().getBoolean(section + ".animation.enabled", false);
+    }
+
     private String replacePlaceholders(String line, Player player) {
-        // Simple placeholder replacement (fallback if PAPI not available)
         line = line.replace("%board_online%", String.valueOf(Bukkit.getOnlinePlayers().size()));
         line = line.replace("%board_lobby_connected%", String.valueOf(plugin.getServerCount("lobby")));
         line = line.replace("%board_lobby_online%", String.valueOf(plugin.getServerCount("lobby")));
         line = line.replace("%board_lobby_max%", getServerMaxPlayers("lobby"));
         line = line.replace("%board_vanilla_online%", String.valueOf(plugin.getServerCount("vanilla")));
         line = line.replace("%board_vanilla_max%", getServerMaxPlayers("vanilla"));
-        line = line.replace("%board_fabric_online%", String.valueOf(plugin.getServerCount("Fabric")));
-        line = line.replace("%board_fabric_max%", getServerMaxPlayers("Fabric"));
+        line = line.replace("%board_fabric_online%", String.valueOf(plugin.getServerCount("fabric")));
+        line = line.replace("%board_fabric_max%", getServerMaxPlayers("fabric"));
 
-        // PlaceholderAPI support
+        for (Object serverObj : plugin.getConfig().getList("servers", Collections.emptyList())) {
+            if (serverObj instanceof Map<?, ?> server) {
+                Object nameObj = server.get("name");
+                if (nameObj == null) continue;
+                String serverName = String.valueOf(nameObj);
+                String key = serverName.toLowerCase();
+                line = line.replace("%board_" + key + "_online%", String.valueOf(plugin.getServerCount(serverName)));
+                line = line.replace("%board_" + key + "_max%", getServerMaxPlayers(serverName));
+                line = line.replace("%board_" + key + "_connected%", String.valueOf(plugin.getServerCount(serverName)));
+            }
+        }
+
         if (Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
             line = PlaceholderAPI.setPlaceholders(player, line);
         }
@@ -103,11 +141,9 @@ public class BoardManager {
     }
 
     private String getServerMaxPlayers(String serverName) {
-        for (Object serverObj : plugin.getConfig().getList("servers", java.util.Collections.emptyList())) {
-            if (serverObj instanceof java.util.Map) {
-                @SuppressWarnings("unchecked")
-                java.util.Map<String, Object> server = (java.util.Map<String, Object>) serverObj;
-                if (serverName.equals(server.get("name"))) {
+        for (Object serverObj : plugin.getConfig().getList("servers", Collections.emptyList())) {
+            if (serverObj instanceof Map<?, ?> server) {
+                if (serverName.equals(String.valueOf(server.get("name")))) {
                     return String.valueOf(server.get("max_players"));
                 }
             }
@@ -119,16 +155,31 @@ public class BoardManager {
         for (Player player : Bukkit.getOnlinePlayers()) {
             updateBoard(player);
         }
-        tickCounter++;
-        // Update animation indices based on config
-        int headerInterval = plugin.getConfig().getInt("header.animation.interval", 20);
-        int footerInterval = plugin.getConfig().getInt("footer.animation.interval", 20);
-        if (plugin.getConfig().getBoolean("header.animation.enabled", true) && tickCounter % headerInterval == 0) {
+
+        int updateInterval = plugin.getConfig().getInt("animations.interval", 20);
+        elapsedTicks += updateInterval;
+        advanceAnimations();
+    }
+
+    private void advanceAnimations() {
+        if (!plugin.getConfig().getBoolean("animations.enabled", true)) {
+            return;
+        }
+
+        if (shouldAnimate("title") && elapsedTicks % getAnimationInterval("title") == 0) {
+            titleAnimationIndex++;
+        }
+        if (shouldAnimate("header") && elapsedTicks % getAnimationInterval("header") == 0) {
             headerAnimationIndex++;
         }
-        if (plugin.getConfig().getBoolean("footer.animation.enabled", true) && tickCounter % footerInterval == 0) {
+        if (shouldAnimate("footer") && elapsedTicks % getAnimationInterval("footer") == 0) {
             footerAnimationIndex++;
         }
+    }
+
+    private int getAnimationInterval(String section) {
+        int interval = plugin.getConfig().getInt(section + ".animation.interval", 20);
+        return Math.max(1, interval);
     }
 
     public void toggleBoard(Player player) {
@@ -136,13 +187,11 @@ public class BoardManager {
         boolean currentlyOff = toggledOff.getOrDefault(uuid, false);
         toggledOff.put(uuid, !currentlyOff);
         if (!currentlyOff) {
-            // Turning off
             FastBoard board = boards.get(uuid);
             if (board != null) {
-                board.updateLines(); // Clear lines
+                board.updateLines();
             }
         } else {
-            // Turning on
             updateBoard(player);
         }
     }
@@ -153,9 +202,11 @@ public class BoardManager {
 
     public void reload() {
         plugin.reloadConfig();
+        titleAnimationIndex = 0;
         headerAnimationIndex = 0;
         footerAnimationIndex = 0;
-        tickCounter = 0;
+        elapsedTicks = 0;
+        plugin.rescheduleBoardUpdates();
         updateAllBoards();
     }
 }
